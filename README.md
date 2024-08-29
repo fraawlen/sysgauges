@@ -47,3 +47,9 @@ By default, the window is created at the top-left of your screen with coordinate
 -y <int16_t>  : custom y coordinate
 ```
 Appearance can be modified through [CGUI's theming options](https://codeberg.org/fraawlen/cassette-graphics/src/branch/trunk/dg.conf). The Cells (widgets) used in SysGauges are `gauge`, `label` and `indicator`.
+
+Mirrors
+-------
+
+- https://codeberg.org/fraawlen/sysgauges
+- https://github.com/fraawlen/sysgauges
