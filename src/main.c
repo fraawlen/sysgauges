@@ -20,6 +20,8 @@
 
 #include <dg/core/core.h>
 #include <dg/base/base.h>
+#include <dg/base/origin.h>
+#include <dg/base/string.h>
 #include <float.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -44,8 +46,10 @@ struct row
 	const char *name;
 	const char *unit;
 	const int precision;
+	const bool custom_max;
 	dg_core_cell_t *label;
 	dg_core_cell_t *gauge;
+	dg_core_cell_t *max;
 };
 
 /************************************************************************************************************/
@@ -67,21 +71,22 @@ static void  _update_all  (uint32_t);
 
 /* - User parameters - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
-static bool         _verbose = false;
-static double       _alert   = 0.95;
-static unsigned int _delay   = 1;
-static int16_t      _width   = 0;
-static int16_t      _x       = 20;
-static int16_t      _y       = 20;
+static bool         _show_max = false;
+static bool         _verbose  = false;
+static double       _alert    = 0.95;
+static unsigned int _delay    = 1;
+static int16_t      _width    = 0;
+static int16_t      _x        = 20;
+static int16_t      _y        = 20;
 
 /* GUI components  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static dg_core_window_t *_w = NULL;
 static dg_core_grid_t   *_g = NULL;
 
-static struct row _cpu = { "CPU", "%",  2, NULL, NULL };
-static struct row _mem = { "MEM", "GB", 1, NULL, NULL };
-static struct row _swp = { "SWP", "GB", 1, NULL, NULL };
+static struct row _cpu = { "CPU", "%",  2, false, NULL, NULL, NULL };
+static struct row _mem = { "MEM", "GB", 1, true,  NULL, NULL, NULL };
+static struct row _swp = { "SWP", "GB", 1, true,  NULL, NULL, NULL };
 
 static int16_t _pos = 0;
 
@@ -108,13 +113,14 @@ main(int argc, char **argv)
 	pthread_create(&_t, NULL, _thread, NULL);
 
 	_w = dg_core_window_create(DG_CORE_WINDOW_FIXED);
-	_g = dg_core_grid_create(2, data.totalswap > 0 ? 3 : 2);
+	_g = dg_core_grid_create(3, data.totalswap > 0 ? 3 : 2);
 
 	/* Grid configuration */
 
+	dg_core_grid_set_column_growth(_g, 1, 1.0);
 	dg_core_grid_set_column_width(_g, 0, 3);
 	dg_core_grid_set_column_width(_g, 1, 32);
-	dg_core_grid_set_column_growth(_g, 1, 1.0);
+	dg_core_grid_set_column_width(_g, 2, 6);
 
 	/* Rows configuration */
 
@@ -137,7 +143,7 @@ main(int argc, char **argv)
 	dg_core_loop_set_callback_signal(_update_all);
 	dg_core_loop_run();
 
-	/* End */
+	/* Cleanup & end */
 
 	dg_core_window_destroy(_w);
 	dg_core_grid_destroy(_g);
@@ -161,12 +167,13 @@ main(int argc, char **argv)
 static void
 _help(void)
 {
-	printf(PROGRAM " " VERSION "\n");
-	printf("usage: " PROGRAM " [option] <value>\n");
 	printf(
+		PROGRAM " " VERSION "\n"
+		"usage: " PROGRAM " [option] <value>\n"
 		"\t-a <0.0..1.0> : alert threshold\n"
 		"\t-h            : print this help\n"
 		"\t-i <uint>     : update interval in seconds\n"
+		"\t-m            : show max MEM and SWP values\n"
 		"\t-v            : print extra information (window width and height)\n"
 		"\t-w <uint16_t> : custom width\n"
 		"\t-x <int16_t>  : custom x coordinate\n"
@@ -180,7 +187,7 @@ _options(int argc, char **argv)
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "a:hi:vw:x:y:")) != -1)
+	while ((opt = getopt(argc, argv, "a:hi:mvw:x:y:")) != -1)
 	{
 		switch (opt)
 		{
@@ -194,6 +201,10 @@ _options(int argc, char **argv)
 
 			case 'i':
 				_delay = strtoul(optarg, NULL, 0);
+				break;
+
+			case 'm':
+				_show_max = true;
 				break;
 
 			case 'v':
@@ -245,6 +256,7 @@ _row_destroy(struct row *r)
 {
 	dg_core_cell_destroy(r->label);
 	dg_core_cell_destroy(r->gauge);
+	dg_core_cell_destroy(r->max);
 }
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -252,20 +264,37 @@ _row_destroy(struct row *r)
 static void
 _row_setup(struct row *r, double max)
 {
+	dg_base_string_t tmp;
+
 	r->label = dg_base_indicator_create();
 	r->gauge = dg_base_gauge_create();
+	r->max   = dg_base_label_create();
 
 	if (max <= DBL_EPSILON)
 	{
 		return;
 	}
 
+	tmp = dg_base_string_convert_double(max, r->precision);
+
+	dg_base_string_append(&tmp, r->unit);
 	dg_base_gauge_set_label_style(r->gauge, r->precision, r->unit);
 	dg_base_gauge_set_limits(r->gauge, 0.0, max);
 	dg_base_indicator_set_label(r->label, r->name);
+	dg_base_label_set_label(r->max, tmp.chars);
+	dg_base_label_set_origin(r->max, DG_BASE_ORIGIN_RIGHT);
+	dg_base_string_clear(&tmp);
 
 	dg_core_grid_assign_cell(_g, r->label, 0, _pos, 1, 1);
-	dg_core_grid_assign_cell(_g, r->gauge, 1, _pos, 1, 1);
+	if (_show_max && r->custom_max)
+	{
+		dg_core_grid_assign_cell(_g, r->gauge, 1, _pos, 1, 1);
+		dg_core_grid_assign_cell(_g, r->max,   2, _pos, 1, 1);
+	}
+	else
+	{
+		dg_core_grid_assign_cell(_g, r->gauge, 1, _pos, 2, 1);
+	}
 
 	_pos++;
 }
