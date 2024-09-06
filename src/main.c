@@ -56,14 +56,14 @@ struct row
 /************************************************************************************************************/
 /************************************************************************************************************/
 
-static void  _help        (void);
-static void  _options     (int, char**);
-static void  _resize      (void);
-static void  _row_destroy (struct row *);
-static void  _row_setup   (struct row *, double);
-static void  _row_update  (struct row *, double, double);
-static void *_thread      (void *);
-static void  _update_all  (uint32_t);
+static void  help        (void);
+static void  options     (int, char**);
+static void  resize      (void);
+static void  row_destroy (struct row *);
+static void  row_setup   (struct row *, double);
+static void  row_update  (struct row *, double, double);
+static void *thread      (void *);
+static void  update_all  (uint32_t);
 
 /************************************************************************************************************/
 /************************************************************************************************************/
@@ -71,28 +71,24 @@ static void  _update_all  (uint32_t);
 
 /* - User parameters - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
-static bool         _show_max = false;
-static bool         _verbose  = false;
-static double       _alert    = 0.95;
-static unsigned int _delay    = 1;
-static int16_t      _width    = 0;
-static int16_t      _x        = 20;
-static int16_t      _y        = 20;
+static bool         show_max = false;
+static bool         verbose  = false;
+static double       alert    = 0.95;
+static unsigned int delay    = 1;
+static int16_t      width    = 0;
+static int16_t      x        = 20;
+static int16_t      y        = 20;
 
 /* GUI components  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
-static dg_core_window_t *_w = NULL;
-static dg_core_grid_t   *_g = NULL;
+static dg_core_window_t *window = NULL;
+static dg_core_grid_t   *grid   = NULL;
 
-static struct row _cpu = { "CPU", "%",  2, false, NULL, NULL, NULL };
-static struct row _mem = { "MEM", "GB", 1, true,  NULL, NULL, NULL };
-static struct row _swp = { "SWP", "GB", 1, true,  NULL, NULL, NULL };
+static struct row cpu = { "CPU", "%",  2, false, NULL, NULL, NULL };
+static struct row mem = { "MEM", "GB", 1, true,  NULL, NULL, NULL };
+static struct row swp = { "SWP", "GB", 1, true,  NULL, NULL, NULL };
 
-static int16_t _pos = 0;
-
-/* Misc  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-
-static pthread_t _t;
+static int16_t pos = 0;
 
 /************************************************************************************************************/
 /* MAIN *****************************************************************************************************/
@@ -102,60 +98,60 @@ int
 main(int argc, char **argv)
 {
 	struct sysinfo data;
+	pthread_t t;
 
 	/* Setup */
-
-	_options(argc, argv);
 
 	dg_core_init(argc, argv, NULL, NULL, NULL);
 	dg_base_init();
 	sysinfo(&data);
-	pthread_create(&_t, NULL, _thread, NULL);
+	options(argc, argv);
+	pthread_create(&t, NULL, thread, NULL);
 
-	_w = dg_core_window_create(DG_CORE_WINDOW_FIXED);
-	_g = dg_core_grid_create(3, data.totalswap > 0 ? 3 : 2);
+	window = dg_core_window_create(DG_CORE_WINDOW_FIXED);
+	grid   = dg_core_grid_create(3, data.totalswap > 0 ? 3 : 2);
 
 	/* Grid configuration */
 
-	dg_core_grid_set_column_growth(_g, 1, 1.0);
-	dg_core_grid_set_column_width(_g, 0, 3);
-	dg_core_grid_set_column_width(_g, 1, 32);
-	dg_core_grid_set_column_width(_g, 2, 6);
+	dg_core_grid_set_column_growth(grid, 1, 1.0);
+	dg_core_grid_set_column_width(grid, 0, 3);
+	dg_core_grid_set_column_width(grid, 1, 32);
+	dg_core_grid_set_column_width(grid, 2, 6);
 
 	/* Rows configuration */
 
-	_row_setup(&_cpu, 100.0);
-	_row_setup(&_mem, data.totalram  GB);
-	_row_setup(&_swp, data.totalswap GB);
+	row_setup(&cpu, 100.0);
+	row_setup(&mem, data.totalram  GB);
+	row_setup(&swp, data.totalswap GB);
 
 	/* Window configuration */
 
-	_resize();
+	resize();
 
-	dg_core_window_push_grid(_w, _g);
-	dg_core_window_rename(_w, "sysmeter", NULL);
-	dg_core_window_activate(_w);
-	dg_core_window_set_fixed_position(_w, _x, _y);
+	dg_core_window_push_grid(window, grid);
+	dg_core_window_rename(window, "sysmeter", NULL);
+	dg_core_window_activate(window);
+	dg_core_window_set_fixed_position(window, x, y);
 
 	/* Run */
 
-	dg_core_resource_set_callback(_resize);
-	dg_core_loop_set_callback_signal(_update_all);
+	dg_core_resource_set_callback(resize);
+	dg_core_loop_set_callback_signal(update_all);
 	dg_core_loop_run();
 
 	/* Cleanup & end */
 
-	dg_core_window_destroy(_w);
-	dg_core_grid_destroy(_g);
+	dg_core_window_destroy(window);
+	dg_core_grid_destroy(grid);
 
-	_row_destroy(&_cpu);
-	_row_destroy(&_mem);
-	_row_destroy(&_swp);
+	row_destroy(&cpu);
+	row_destroy(&mem);
+	row_destroy(&swp);
 
 	dg_base_reset();
 	dg_core_reset();
 
-	pthread_join(_t, NULL);
+	pthread_join(t, NULL);
 
 	return 0;
 }
@@ -165,7 +161,7 @@ main(int argc, char **argv)
 /************************************************************************************************************/
 
 static void
-_help(void)
+help(void)
 {
 	printf(
 		PROGRAM " " VERSION "\n"
@@ -183,7 +179,7 @@ _help(void)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void
-_options(int argc, char **argv)
+options(int argc, char **argv)
 {
 	int opt;
 
@@ -192,35 +188,35 @@ _options(int argc, char **argv)
 		switch (opt)
 		{
 			case 'a':
-				_alert = strtod(optarg, NULL);
+				alert = strtod(optarg, NULL);
 				break;
 
 			case 'h':
-				_help();
+				help();
 				exit(0);
 
 			case 'i':
-				_delay = strtoul(optarg, NULL, 0);
+				delay = strtoul(optarg, NULL, 0);
 				break;
 
 			case 'm':
-				_show_max = true;
+				show_max = true;
 				break;
 
 			case 'v':
-				_verbose = true;
+				verbose = true;
 				break;
 
 			case 'w':
-				_width = strtoul(optarg, NULL, 0);
+				width = strtoul(optarg, NULL, 0);
 				break;
 
 			case 'x':
-				_x = strtol(optarg, NULL, 0);
+				x = strtol(optarg, NULL, 0);
 				break;
 
 			case 'y':
-				_y = strtol(optarg, NULL, 0);
+				y = strtol(optarg, NULL, 0);
 				break;
 
 			case '?':
@@ -234,25 +230,25 @@ _options(int argc, char **argv)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void
-_resize(void)
+resize(void)
 {
-	int16_t width  = dg_core_grid_get_min_pixel_width(_g);
-	int16_t height = dg_core_grid_get_min_pixel_height(_g);
+	int16_t w = dg_core_grid_get_min_pixel_width(grid);
+	int16_t h = dg_core_grid_get_min_pixel_height(grid);
 
-	dg_core_window_set_fixed_size(_w, _width > width ? _width : width, height);
+	dg_core_window_set_fixed_size(window, width > w ? width : w, h);
 
-	if (_verbose)
+	if (verbose)
 	{
 		printf("window size updated\n");
-		printf("width  = %i\n", width);
-		printf("height = %i\n", height);
+		printf("width  = %i\n", w);
+		printf("height = %i\n", h);
 	}
 }
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void
-_row_destroy(struct row *r)
+row_destroy(struct row *r)
 {
 	dg_core_cell_destroy(r->label);
 	dg_core_cell_destroy(r->gauge);
@@ -262,7 +258,7 @@ _row_destroy(struct row *r)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void
-_row_setup(struct row *r, double max)
+row_setup(struct row *r, double max)
 {
 	dg_base_string_t tmp;
 
@@ -285,24 +281,24 @@ _row_setup(struct row *r, double max)
 	dg_base_label_set_origin(r->max, DG_BASE_ORIGIN_RIGHT);
 	dg_base_string_clear(&tmp);
 
-	dg_core_grid_assign_cell(_g, r->label, 0, _pos, 1, 1);
-	if (_show_max && r->custom_max)
+	dg_core_grid_assign_cell(grid, r->label, 0, pos, 1, 1);
+	if (show_max && r->custom_max)
 	{
-		dg_core_grid_assign_cell(_g, r->gauge, 1, _pos, 1, 1);
-		dg_core_grid_assign_cell(_g, r->max,   2, _pos, 1, 1);
+		dg_core_grid_assign_cell(grid, r->gauge, 1, pos, 1, 1);
+		dg_core_grid_assign_cell(grid, r->max,   2, pos, 1, 1);
 	}
 	else
 	{
-		dg_core_grid_assign_cell(_g, r->gauge, 1, _pos, 2, 1);
+		dg_core_grid_assign_cell(grid, r->gauge, 1, pos, 2, 1);
 	}
 
-	_pos++;
+	pos++;
 }
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void
-_row_update(struct row *r, double val, double high)
+row_update(struct row *r, double val, double high)
 {
 	dg_base_gauge_set_value(r->gauge, val);
 
@@ -319,14 +315,14 @@ _row_update(struct row *r, double val, double high)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void *
-_thread(void *params)
+thread(void *params)
 {
 	(void)params;
 
 	while (dg_core_is_init())
 	{
 		dg_core_loop_send_signal(0);
-		sleep(_delay);
+		sleep(delay);
 	}
 
 	pthread_exit(NULL);
@@ -335,7 +331,7 @@ _thread(void *params)
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 static void
-_update_all(uint32_t serial)
+update_all(uint32_t serial)
 {
 	struct sysinfo data;
 
@@ -343,7 +339,7 @@ _update_all(uint32_t serial)
 
 	sysinfo(&data);
 
-	_row_update(&_cpu, data.loads[0] * 100.0 / get_nprocs() / (1 << SI_LOAD_SHIFT), 100.0 * _alert);
-	_row_update(&_mem, (data.totalram  - data.freeram)  GB, data.totalram  GB * _alert);
-	_row_update(&_swp, (data.totalswap - data.freeswap) GB, data.totalswap GB * _alert);
+	row_update(&cpu, data.loads[0] * 100.0 / get_nprocs() / (1 << SI_LOAD_SHIFT), 100.0 * alert);
+	row_update(&mem, (data.totalram  - data.freeram)  GB, data.totalram  GB * alert);
+	row_update(&swp, (data.totalswap - data.freeswap) GB, data.totalswap GB * alert);
 }

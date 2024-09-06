@@ -48,6 +48,11 @@ By default, the window is created at the top-left of your screen with coordinate
 ```
 Appearance can be modified through [CGUI's theming options](/../../../../fraawlen/cassette-graphics/src/branch/trunk/dg.conf). The Cells (widgets) used in SysGauges are `gauge`, `label` and `indicator`.
 
+Credits
+-------
+
+- [Terminus](https://terminus-font.sourceforge.net/), font used in banner picture
+
 Mirrors
 -------
 
