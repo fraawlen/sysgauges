@@ -3,7 +3,7 @@ SysGauges
 
 <p align="center"><img src="./extras/banner.png"></p>
 
-SysGauges is a tiny GUI system monitor that keeps track of the CPU load (1min average), RAM and SWAP usage. It's made with the Cassette-Graphics (CGUI) library. This program is free and open-source software licensed under the [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). It's made to run on modern Linux systems with an X11 display server.
+SysGauges is a tiny GUI system monitor that keeps track of the CPU load (1min average), RAM and SWAP usage. It's made with the Cassette framework. This program is free and open-source software licensed under the [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). It's made to run on modern POSIX systems with an X11 display server.
 
 Dependencies
 ------------
@@ -15,12 +15,12 @@ Dependencies
 
 - Library
 
-	- [Cassette-Graphics](/../../../../fraawlen/cassette-graphics) 
+	- [Cassette](/../../../../fraawlen/cassette) 
 
 Installation
 ------------
 
-First, edit the makefile if you want to change the installation destinations. These are represented by the variables `DEST_HEADERS` and `DEST_LIBS` for the public API headers and library files respectively. By default, they are set to `/usr/include/cassette/` and `/usr/lib`. Then, build and install SysGauges with the following commands :
+First, edit the makefile if you want to change the installation destination. It represented by the variables `DIR_INSTALL`. By default, they are set to `/usr/bin/`. Then, build and install SysGauges with the following commands :
 
 ```
 make
@@ -46,7 +46,7 @@ By default, the window is created at the top-left of your screen with coordinate
 -x <int16_t>  : custom x coordinate
 -y <int16_t>  : custom y coordinate
 ```
-Appearance can be modified through [CGUI's theming options](/../../../../fraawlen/cassette-graphics/src/branch/trunk/dg.conf). The Cells (widgets) used in SysGauges are `gauge`, `label` and `indicator`.
+Appearance can be modified through [Cassete's theming options](https://github.com/fraawlen/cassette/blob/trunk/dg.conf). The Cells (widgets) used in SysGauges are `gauge`, `label` and `indicator`.
 
 Credits
 -------
@@ -56,5 +56,5 @@ Credits
 Mirrors
 -------
 
-- https://codeberg.org/fraawlen/sysgauges
 - https://github.com/fraawlen/sysgauges
+- https://codeberg.org/fraawlen/sysgauges
